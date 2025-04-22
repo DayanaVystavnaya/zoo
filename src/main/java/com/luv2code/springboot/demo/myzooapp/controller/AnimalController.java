@@ -1,55 +1,69 @@
 package com.luv2code.springboot.demo.myzooapp.controller;
 
 import com.luv2code.springboot.demo.myzooapp.model.Animal;
-import com.luv2code.springboot.demo.myzooapp.repository.AnimalRepository;
+import com.luv2code.springboot.demo.myzooapp.service.AnimalService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
-@RequestMapping("/animals") // address + requestMapping
+@RequestMapping("/animals")
 public class AnimalController {
 
     @Autowired
-    private AnimalRepository animalRepository;
+    private AnimalService animalService;
 
-    // CREATE
+    // ✅ Создать новое животное
     @PostMapping
-    public Animal create(@RequestBody Animal animal) {
-        return animalRepository.save(animal);
+    public ResponseEntity<Animal> createAnimal(@RequestBody Animal animal) {
+        Animal createdAnimal = animalService.createAnimal(animal.getName(), animal.getSpecies(), animal.getAge());
+        return ResponseEntity.ok(createdAnimal);
     }
 
-    // READ all
+    // ✅ Получить все животные
     @GetMapping
-    public List<Animal> getAll() {
-        return animalRepository.findAll();
+    public ResponseEntity<List<Animal>> getAllAnimals() {
+        List<Animal> animals = animalService.getAll();
+        return ResponseEntity.ok(animals);
     }
 
-    // READ by id
+    // ✅ Получить животное по ID
     @GetMapping("/{id}")
-    public Animal getById(@PathVariable Long id) {
-        return animalRepository.findById(id).orElse(null);
+    public ResponseEntity<Animal> getAnimalById(@PathVariable Long id) {
+        Animal animal = animalService.getById(id);
+        return ResponseEntity.ok(animal);
     }
 
-    // UPDATE
-    @PutMapping("/{id}")
-    public Animal update(@PathVariable Long id, @RequestBody Animal updatedAnimal) {
-        Optional<Animal> optional = animalRepository.findById(id);
-        if (optional.isPresent()) {
-            Animal animal = optional.get();
-            animal.setName(updatedAnimal.getName());
-            animal.setSpecies(updatedAnimal.getSpecies());
-            animal.setAge(updatedAnimal.getAge());
-            return animalRepository.save(animal);
+    // ✅ Фильтрация животных по виду
+    @GetMapping("/filter")
+    public ResponseEntity<List<Animal>> filterAnimals(
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) Integer minAge) {
+
+        if (species != null && minAge != null) {
+            return ResponseEntity.ok(animalService.filterBySpeciesAndMinAge(species, minAge));
+        } else if (species != null) {
+            return ResponseEntity.ok(animalService.filterBySpecies(species));
+        } else if (minAge != null) {
+            return ResponseEntity.ok(animalService.filterByMinAge(minAge));
+        } else {
+            return ResponseEntity.ok(animalService.getAll()); // если параметры не указаны, возвращаем всех животных
         }
-        return null;
     }
 
-    // DELETE
-    @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        animalRepository.deleteById(id);
+    // ✅ Добавить друга животному
+    @PostMapping("/{id}/add-friend/{friendId}")
+    public ResponseEntity<?> addFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        animalService.addFriend(id, friendId);
+        return ResponseEntity.ok().build();
+    }
+
+    // ✅ Назначить владельца животному
+    @PostMapping("/{animalId}/assign-owner/{ownerId}")
+    public ResponseEntity<Animal> assignOwner(@PathVariable Long animalId, @PathVariable Long ownerId) {
+        Animal updatedAnimal = animalService.assignOwner(animalId, ownerId);
+        return ResponseEntity.ok(updatedAnimal);
     }
 }

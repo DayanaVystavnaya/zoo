@@ -1,10 +1,18 @@
 package com.luv2code.springboot.demo.myzooapp.model;
 
-
 import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Animal {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -13,23 +21,16 @@ public class Animal {
     private String species;
     private int age;
 
-    public Animal() {}
+    @ManyToOne
+    private Owner owner;
 
-    public Animal(String name, String species, int age) {
-        this.name = name;
-        this.species = species;
-        this.age = age;
-    }
+    @ManyToMany
+    @JoinTable(
+            name = "animal_friendships",
+            joinColumns = @JoinColumn(name = "animal_id"),
+            inverseJoinColumns = @JoinColumn(name = "friend_id")
+    )
+    private Set<Animal> friends = new HashSet<>();
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getSpecies() { return species; }
-    public void setSpecies(String species) { this.species = species; }
-
-    public int getAge() { return age; }
-    public void setAge(int age) { this.age = age; }
 }

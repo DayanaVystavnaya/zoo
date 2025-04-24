@@ -1,81 +1,139 @@
 package com.luv2code.springboot.demo.myzooapp.service;
 
+import com.luv2code.springboot.demo.myzooapp.dto.AnimalDTO;
 import com.luv2code.springboot.demo.myzooapp.model.Animal;
-import com.luv2code.springboot.demo.myzooapp.model.Owner;  // Импорт модели Owner
+import com.luv2code.springboot.demo.myzooapp.model.Owner;
 import com.luv2code.springboot.demo.myzooapp.repository.AnimalRepository;
-import com.luv2code.springboot.demo.myzooapp.repository.OwnerRepository;  // Импорт OwnerRepository
+import com.luv2code.springboot.demo.myzooapp.repository.OwnerRepository;
+import com.luv2code.springboot.demo.myzooapp.repository.specification.AnimalSpecification;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
 @Service
+@Validated
 public class AnimalService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AnimalService.class);
 
     @Autowired
     private AnimalRepository animalRepository;
 
     @Autowired
-    private OwnerRepository ownerRepository;  // Внедрение зависимости OwnerRepository
+    private OwnerRepository ownerRepository;
 
-    // ✅ Создать новое животное
-    public Animal createAnimal(String name, String species, int age) {
-        Animal animal = new Animal();
-        return animalRepository.save(animal);
+    public Animal createAnimal(@Valid AnimalDTO dto) {
+        logger.info("Creating new animal: {}", dto);
+
+        validateAnimalName(dto.getName());
+        Animal animal = buildAnimalFromDto(new Animal(), dto);
+        Animal saved = animalRepository.save(animal);
+
+        logger.debug("Animal created with ID: {}", saved.getId());
+        return saved;
     }
 
-    // ✅ Получить все животные
+    public Animal updateAnimal(Long id, @Valid AnimalDTO dto) {
+        logger.info("Updating animal with ID: {}", id);
+
+        Animal animal = findAnimalById(id);
+        validateAnimalName(dto.getName());
+        buildAnimalFromDto(animal, dto);
+        Animal updated = animalRepository.save(animal);
+
+        logger.debug("Animal updated: {}", updated);
+        return updated;
+    }
+
+    public void deleteAnimal(Long id) {
+        logger.warn("Deleting animal with ID: {}", id);
+
+        if (!animalRepository.existsById(id)) {
+            logger.error("Animal not found with ID: {}", id);
+            throw new RuntimeException("Animal not found: " + id);
+        }
+        animalRepository.deleteById(id);
+        logger.info("Animal with ID {} deleted successfully", id);
+    }
+
     public List<Animal> getAll() {
+        logger.info("Retrieving all animals");
         return animalRepository.findAll();
     }
 
-    // ✅ Получить животное по ID
     public Animal getById(Long id) {
-        return animalRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Животное не найдено с ID: " + id));
+        logger.info("Getting animal by ID: {}", id);
+        return findAnimalById(id);
     }
 
-    // ✅ Фильтрация по виду
-    public List<Animal> filterBySpecies(String species) {
-        return animalRepository.findBySpecies(species);
+    public List<Animal> filterAnimals(String species, Integer minAge) {
+        logger.info("Filtering animals by species={} and minAge={}", species, minAge);
+        Specification<Animal> spec = AnimalSpecification.withFilters(species, minAge);
+        return animalRepository.findAll(spec);
     }
 
-    // ✅ Фильтрация по минимальному возрасту
-    public List<Animal> filterByMinAge(int minAge) {
-        return animalRepository.findByAgeGreaterThanEqual(minAge);
-    }
-
-    // ✅ Фильтрация по виду и минимальному возрасту
-    public List<Animal> filterBySpeciesAndMinAge(String species, int minAge) {
-        return animalRepository.findBySpeciesAndAgeGreaterThanEqual(species, minAge);
-    }
-
-    // ✅ Добавить друга
     public Animal addFriend(Long id, Long friendId) {
-        Animal animal = animalRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Животное не найдено с ID: " + id));
-        Animal friend = animalRepository.findById(friendId)
-                .orElseThrow(() -> new RuntimeException("Друг не найден с ID: " + friendId));
+        logger.info("Adding friend: animalId={} friendId={}", id, friendId);
 
-        animal.getFriends().add(friend); // добавляем друга в список друзей
-        friend.getFriends().add(animal); // добавляем животное в список друзей другого животного
+        Animal animal = findAnimalById(id);
+        Animal friend = findAnimalById(friendId);
 
-        animalRepository.save(animal); // сохраняем изменения
-        animalRepository.save(friend); // сохраняем изменения
+        animal.getFriends().add(friend);
+        friend.getFriends().add(animal);
 
+        animalRepository.save(friend);
+        Animal result = animalRepository.save(animal);
+
+        logger.debug("Friendship created between animal {} and {}", id, friendId);
+        return result;
+    }
+
+    public Animal assignOwner(Long animalId, Long ownerId) {
+        logger.info("Assigning owner: animalId={} ownerId={}", animalId, ownerId);
+
+        Animal animal = findAnimalById(animalId);
+        Owner owner = findOwnerById(ownerId);
+
+        animal.setOwner(owner);
+        Animal updated = animalRepository.save(animal);
+
+        logger.debug("Owner {} assigned to animal {}", ownerId, animalId);
+        return updated;
+    }
+
+    private Animal buildAnimalFromDto(Animal animal, AnimalDTO dto) {
+        animal.setName(dto.getName().trim());
+        animal.setSpecies(dto.getSpecies());
+        animal.setAge(dto.getAge());
         return animal;
     }
 
-    // ✅ Назначить владельца животному
-    public Animal assignOwner(Long animalId, Long ownerId) {
-        Animal animal = animalRepository.findById(animalId)
-                .orElseThrow(() -> new RuntimeException("Животное не найдено с ID: " + animalId));
+    private void validateAnimalName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            logger.warn("Validation failed: empty animal name");
+            throw new IllegalArgumentException("Animal name must not be empty");
+        }
+    }
 
-        // Проверяем наличие владельца в репозитории
-        Owner owner = ownerRepository.findById(ownerId)
-                .orElseThrow(() -> new RuntimeException("Владелец не найден с ID: " + ownerId));
+    private Animal findAnimalById(Long id) {
+        return animalRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.error("Animal not found with ID: {}", id);
+                    return new RuntimeException("Animal not found: " + id);
+                });
+    }
 
-        animal.setOwner(owner); // назначаем владельца
-        return animalRepository.save(animal); // сохраняем изменения
+    private Owner findOwnerById(Long id) {
+        return ownerRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.error("Owner not found with ID: {}", id);
+                    return new RuntimeException("Owner not found: " + id);
+                });
     }
 }

@@ -1,7 +1,11 @@
 package com.luv2code.springboot.demo.myzooapp.controller;
 
+import com.luv2code.springboot.demo.myzooapp.dto.AnimalDTO;
 import com.luv2code.springboot.demo.myzooapp.model.Animal;
 import com.luv2code.springboot.demo.myzooapp.service.AnimalService;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,58 +16,68 @@ import java.util.List;
 @RequestMapping("/animals")
 public class AnimalController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AnimalController.class);
+
     @Autowired
     private AnimalService animalService;
 
-    // ✅ Создать новое животное
     @PostMapping
-    public ResponseEntity<Animal> createAnimal(@RequestBody Animal animal) {
-        Animal createdAnimal = animalService.createAnimal(animal.getName(), animal.getSpecies(), animal.getAge());
+    public ResponseEntity<Animal> createAnimal(@Valid @RequestBody AnimalDTO dto) {
+        logger.info("Received request to create animal: {}", dto);
+        Animal createdAnimal = animalService.createAnimal(dto);
+        logger.debug("Animal created with ID: {}", createdAnimal.getId());
         return ResponseEntity.ok(createdAnimal);
     }
 
-    // ✅ Получить все животные
+    @PutMapping("/{id}")
+    public ResponseEntity<Animal> updateAnimal(@PathVariable Long id, @Valid @RequestBody AnimalDTO dto) {
+        logger.info("Received request to update animal ID {} with data: {}", id, dto);
+        Animal updatedAnimal = animalService.updateAnimal(id, dto);
+        logger.debug("Animal updated: {}", updatedAnimal);
+        return ResponseEntity.ok(updatedAnimal);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteAnimal(@PathVariable Long id) {
+        logger.warn("Received request to delete animal with ID: {}", id);
+        animalService.deleteAnimal(id);
+        logger.info("Animal with ID {} deleted successfully", id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping
     public ResponseEntity<List<Animal>> getAllAnimals() {
-        List<Animal> animals = animalService.getAll();
-        return ResponseEntity.ok(animals);
+        logger.info("Fetching all animals");
+        return ResponseEntity.ok(animalService.getAll());
     }
 
-    // ✅ Получить животное по ID
     @GetMapping("/{id}")
     public ResponseEntity<Animal> getAnimalById(@PathVariable Long id) {
-        Animal animal = animalService.getById(id);
-        return ResponseEntity.ok(animal);
+        logger.info("Fetching animal by ID: {}", id);
+        return ResponseEntity.ok(animalService.getById(id));
     }
 
-    // ✅ Фильтрация животных по виду
     @GetMapping("/filter")
     public ResponseEntity<List<Animal>> filterAnimals(
             @RequestParam(required = false) String species,
             @RequestParam(required = false) Integer minAge) {
-
-        if (species != null && minAge != null) {
-            return ResponseEntity.ok(animalService.filterBySpeciesAndMinAge(species, minAge));
-        } else if (species != null) {
-            return ResponseEntity.ok(animalService.filterBySpecies(species));
-        } else if (minAge != null) {
-            return ResponseEntity.ok(animalService.filterByMinAge(minAge));
-        } else {
-            return ResponseEntity.ok(animalService.getAll()); // если параметры не указаны, возвращаем всех животных
-        }
+        logger.info("Filtering animals by species: {} and minAge: {}", species, minAge);
+        return ResponseEntity.ok(animalService.filterAnimals(species, minAge));
     }
 
-    // ✅ Добавить друга животному
     @PostMapping("/{id}/add-friend/{friendId}")
-    public ResponseEntity<?> addFriend(@PathVariable Long id, @PathVariable Long friendId) {
+    public ResponseEntity<Void> addFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        logger.info("Adding friendship between animal {} and {}", id, friendId);
         animalService.addFriend(id, friendId);
+        logger.info("Friendship added successfully between {} and {}", id, friendId);
         return ResponseEntity.ok().build();
     }
 
-    // ✅ Назначить владельца животному
     @PostMapping("/{animalId}/assign-owner/{ownerId}")
     public ResponseEntity<Animal> assignOwner(@PathVariable Long animalId, @PathVariable Long ownerId) {
+        logger.info("Assigning owner {} to animal {}", ownerId, animalId);
         Animal updatedAnimal = animalService.assignOwner(animalId, ownerId);
+        logger.info("Owner assigned successfully");
         return ResponseEntity.ok(updatedAnimal);
     }
 }
